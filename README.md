@@ -116,7 +116,23 @@ File ftp://192.168.1.143/c2960x-universalk9-mz.152-7.E7.bin on device 192.168.1.
 
 To download all of the recursive dependencies use `python3 -m pip download --platform win_amd64 --no-deps`.
 
-These dependencies should be periodically updated.
+The python version from the system you are running, should match the destination python version. 
+
+```bash
+% python3 --version
+Python 3.10.8
+```
+
+If `python3` is a different version, install a matching version, and use the specific command for that version of python.
+
+```bash
+% python3.11 --version
+Python 3.11.0
+```
+->
+```bash
+python3.11 -m pip download --platform win_amd64 --no-deps
+```
 
 ```bash
 python3 -m pip download --platform win_amd64 --no-deps napalm PyYAML future jinja2 transitions pynacl bcrypt netaddr toml loguru charset-normalizer==2.1.1 pyparsing textfsm==1.1.2 ciscoconfparse junos-eznc paramiko tenacity urllib3 yamlordereddictloader pycparser netmiko scp cffi idna MarkupSafe ncclient lxml pyeapi certifi dnspython six passlib requests cryptography ntc-templates pyserial setuptools win32_setctime netutils colorama typing-extensions ttp ttp-templates chardet rich
