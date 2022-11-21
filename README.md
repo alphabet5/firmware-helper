@@ -57,7 +57,7 @@ When transferring files, the list should be a tab-delimited file with hostname/i
 ### Collecting information from devices.
 
 ```bash
-% python3.11 fw/fw.py --user admin --password password fetch                       
+% python3.11 fw/fw.py --user username --password password fetch                       
 Connecting to 192.168.1.254
 Running commands on 192.168.1.254
 Running 'get_facts' on 192.168.1.254
@@ -84,7 +84,7 @@ File ftp://192.168.1.143/c2960x-universalk9-mz.152-7.E7.bin on device 192.168.1.
 ### Transferring Firmware
 
 ```bash
-% python3.11 fw/fw.py --user admin --password password --list transfer.csv --confirm-transfer transfer
+% python3.11 fw/fw.py --user username --password password --list transfer.csv --confirm-transfer transfer
 Connecting to 192.168.1.254
 Running commands on 192.168.1.254
 Running 'get_facts' on 192.168.1.254
