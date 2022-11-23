@@ -149,3 +149,7 @@ python -m pip install *
 
 ### 0.0.1 - Initial Release
 - Support for Cisco devices added.
+
+### 0.0.2
+- Support other prompts when switches are configured for an interactive terminal.
+- Added 10k '!' value for progress when using scp.

@@ -271,17 +271,29 @@ def transfer_helper(info):
             copy_progress = device._netmiko_device.send_command_timing(
                 "copy " + info["file"] + " flash:"
             )
-            if "Destination filename" in copy_progress:
-                copy_progress += device._netmiko_device.send_command_timing("\n")
-            if "There is a file already existing" in copy_progress:
-                copy_progress += device._netmiko_device.send_command_timing("\n")
+            possible_prompts = {r"Address or name of remote host \[.*\]?": '\n',
+                                r"Source username \[.*\]\? ": 'anonymous\n',
+                                r"Source filename \[.*\]\?": '\n',
+                                r".*Destination filename \[.*\]\?": '\n',
+                                r"Do you want to over write\? \[.*\]": 'confirm\n',
+                                r"Password:": '\n'}
             copying = True
+            last_print = ''
             while copying:
                 copy_progress += device._netmiko_device.read_channel()
+                for match, command in possible_prompts.items():
+                    # only check the last line. Avoids regex multiline headaches.
+                    check = copy_progress.splitlines()[-1] 
+                    if re.match(match, check):
+                        device._netmiko_device.write_channel(command)
                 if hostname in copy_progress:
                     copying = False
                 else:
-                    percent_complete = (copy_progress.count("!") * 256000) / int(
+                    if 'scp' in info["file"]:
+                        progress_modifier = 10000
+                    else:
+                        progress_modifier = 256000
+                    percent_complete = (copy_progress.count("!") * progress_modifier) / int(
                         info["size"]
                     )
                     if percent_complete > 0.01:
@@ -303,7 +315,6 @@ def transfer_helper(info):
                 + " completed in "
                 + str(start_time - datetime.now())
             )
-            print(copy_progress)
             # Verify the md5 of the copied file.
             parsed["raw"]["verify"], device, info = verify_helper(device, info)
             parsed["md5"] = re.findall(r".*= (.*)", parsed["raw"]["verify"])[0]
@@ -352,10 +363,6 @@ def transfer_helper(info):
         except:
             pass
         return {"device": device.hostname, "output": parsed}
-    # check if file exists
-    # if file exists, verify md5
-    # if md5 doesn't match, or file doesn't exist verify free space
-    # if free space, copy the file.
 
 
 def verify_helper(device, info):
