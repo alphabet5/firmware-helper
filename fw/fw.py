@@ -73,7 +73,6 @@ def fetch(args):
     with open(args["list"], "r") as switches_file:
         switches = switches_file.read().splitlines()
     driver = get_network_driver(args["driver"])
-    # Currently not parallel.
     output = dict()
     switch_list = list()
     for switch in switches:
@@ -467,8 +466,8 @@ def main():
         check_transport(args)
     elif "fetch" in args["function"]:
         fetch(args)
-    # elif "parse" in args["function"]:
-    #     parse(args)
+    elif "parse" in args["function"]:
+        parse_output(args)
     elif "transfer" in args["function"]:
         transfer(args)
 

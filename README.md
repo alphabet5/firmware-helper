@@ -10,27 +10,26 @@ fw is a tool to help collect information and transfer images to a large number o
 
 ```
 % python3.11 fw/fw.py --help
-usage: fw.py [-h] [--user USER] [--password PASSWORD] [--enable ENABLE] [--list LIST]
-             [--parallel PARALLEL] [--delay DELAY] [--driver DRIVER] [--confirm-transfer]
-             [--output OUTPUT]
+usage: fw.py [-h] [--user USER] [--password PASSWORD] [--enable ENABLE] [--list LIST] [--parallel PARALLEL]
+             [--delay DELAY] [--driver DRIVER] [--confirm-transfer] [--output OUTPUT]
              function
 
 Utility to help with firmware upgrades of network infrastructure devices.
 
 positional arguments:
-  function             Function to run. fetch: fetch information from the list of devices. parse:
-                       parse output.json (--output) to hostname, ip, model, image, version, boot-
-                       file, and free-space in output.txt. check-transport: check transport
-                       connectivity to the list of devices. (telnet or ssh) transfer: verify files
-                       have been transferred, and copy files that have not been transferred.
+  function             Function to run. fetch: fetch information from the list of devices. parse: parse
+                       output.json (--output) to hostname, ip, model, image, version, boot-file, and free-
+                       space in output.txt. check-transport: check transport connectivity to the list of
+                       devices. (telnet or ssh) transfer: verify files have been transferred, and copy files
+                       that have not been transferred.
 
 options:
   -h, --help           show this help message and exit
   --user USER          Username for logging into the devices.
   --password PASSWORD  Password for logging into the devices.
   --enable ENABLE      Enable password for the devices.
-  --list LIST          File containing the list of devices, of list of devices and files to
-                       transfer. Default: ./switch-list.txt
+  --list LIST          File containing the list of devices, of list of devices and files to transfer. Default:
+                       ./switch-list.txt
   --parallel PARALLEL  Number of threads to run in parallel. Default: 80
   --delay DELAY        Global delay factor for timeouts. Default: 10
   --driver DRIVER      Napalm driver to use. Default: ios
@@ -153,3 +152,8 @@ python -m pip install *
 ### 0.0.2
 - Support other prompts when switches are configured for an interactive terminal.
 - Added 10k '!' value for progress when using scp.
+
+
+### 0.0.3
+- Cleaned up inaccurate comments.
+- Enabled direct call of the parsing function.
