@@ -6,6 +6,12 @@
 
 fw is a tool to help collect information and transfer images to a large number of network infrastructure devices.
 
+## Dependencies
+
+```bash
+python3.11 -m pip install napalm joblib
+```
+
 ## Usage
 
 ```
@@ -157,3 +163,7 @@ python -m pip install *
 ### 0.0.3
 - Cleaned up inaccurate comments.
 - Enabled direct call of the parsing function.
+
+### 0.0.4
+- Changed references.
+- Fixed reference to deepcopy on loading info.

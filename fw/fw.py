@@ -9,6 +9,7 @@ import traceback
 import netmiko.exceptions
 from time import sleep
 from datetime import datetime
+import copy
 
 
 class ConnectivityFailure(Exception):
@@ -52,7 +53,7 @@ def get_device(info):
         raise ConnectivityFailure(
             "SSH and Telnet connectivity failed to " + info["switch"]
         )
-    print("Connecting to " + device.hostname)
+    print("Connecting to " + info["switch"])
     device.open()
     return device
 
@@ -72,12 +73,10 @@ def check_transport(args):
 def fetch(args):
     with open(args["list"], "r") as switches_file:
         switches = switches_file.read().splitlines()
-    driver = get_network_driver(args["driver"])
-    output = dict()
     switch_list = list()
     for switch in switches:
         # args contains driver, delay, enable, user and password that is passed as 'info' to the helper function.
-        info = args
+        info = copy.deepcopy(args)
         info["switch"] = switch
         switch_list.append(info)
     output = Parallel(n_jobs=args["parallel"], verbose=0, backend="threading")(
@@ -90,80 +89,83 @@ def fetch(args):
 
 def fetch_helper(info):
     try:
-        device = get_device(info)
         parsed = dict()
-        print("Running commands on " + device.hostname + "")
+        device = get_device(info)
+        print("Running commands on " + info["switch"] + "")
         commands = ["show version", "dir"]
         raw = device.cli(commands)
         parsed["raw"] = raw
         for command in commands:
             parsed[command] = parse.parse_output("cisco_ios", command, raw[command])
-        print("Running 'get_facts' on " + device.hostname)
+        print("Running 'get_facts' on " + info["switch"])
         parsed["facts"] = device.get_facts()
-        print("Information collection for " + device.hostname + " complete.")
-        return {"device": device.hostname, "output": parsed}
+        print("Information collection for " + info["switch"] + " complete.")
+        return {"device": info["switch"], "output": parsed}
     except ConnectivityFailure:
         print("SSH and Telnet connectivity failed to " + info["switch"])
         return {"device": info["switch"], "output": {"error": "Failed, Connectivity"}}
     except netmiko.exceptions.NetmikoAuthenticationException:
-        print("Error authenticating to device " + device.hostname)
+        print("Error authenticating to device " + info["switch"])
         print(traceback.format_exc())
-        return {"device": device.hostname, "output": {"error": "Failed, Auth"}}
+        return {"device": info["switch"], "output": {"error": "Failed, Auth"}}
     except:
-        print("Error with device " + device.hostname)
+        print("Error with device " + info["switch"])
         print(traceback.format_exc())
         parsed["error"] = traceback.format_exc()
         try:
             device.close()
         except:
             pass
-        return {"device": device.hostname, "output": parsed}
+        return {"device": info["switch"], "output": parsed}
 
 
 def parse_output(args):
     with open(args["output"], "r") as f:
         data = json.loads(f.read())
-    for e in data:
-        if "error" not in e["output"]:
-            parsed = e["output"]
-            image_name = re.match(
-                r".*?\((.*?)\).*", parsed["facts"]["os_version"]
-            ).group(1)
-            image_version = re.match(
-                r".*Version (.*?),?\s.*", parsed["facts"]["os_version"]
-            ).group(1)
-            running_image_bin = parsed["show version"][0]["running_image"]
-            free_space = parsed["dir"][0]["total_free"]
-            print(
-                parsed["facts"]["hostname"]
-                + "\t"
-                + e["device"]
-                + "\t"
-                + parsed["facts"]["model"]
-                + "\t"
-                + image_name
-                + "\t"
-                + image_version
-                + "\t"
-                + running_image_bin
-                + "\t"
-                + free_space
-                + "\n"
-            )
-        else:
-            print(
-                parsed["facts"]["hostname"]
-                + "\t"
-                + e["device"]
-                + "\t"
-                + "\t"
-                + "\t"
-                + "\t"
-                + "\t"
-                + "\t"
-                + str(e["output"]["error"]).replace("\n", r"\n")
-                + "\n"
-            )
+    with open(args["parse_output"], "w") as f:
+        for e in data:
+            if "error" not in e["output"]:
+                parsed = e["output"]
+                image_name = re.match(
+                    r".*?\((.*?)\).*", parsed["facts"]["os_version"]
+                ).group(1)
+                image_version = re.match(
+                    r".*Version (.*?),?\s.*", parsed["facts"]["os_version"]
+                ).group(1)
+                running_image_bin = parsed["show version"][0]["running_image"]
+                free_space = parsed["dir"][0]["total_free"]
+                line = (
+                    parsed["facts"]["hostname"]
+                    + "\t"
+                    + e["device"]
+                    + "\t"
+                    + parsed["facts"]["model"]
+                    + "\t"
+                    + image_name
+                    + "\t"
+                    + image_version
+                    + "\t"
+                    + running_image_bin
+                    + "\t"
+                    + free_space
+                )
+                print(line)
+                f.write(line + "\n")
+            else:
+                line = (
+                    parsed["facts"]["hostname"]
+                    + "\t"
+                    + e["device"]
+                    + "\t"
+                    + "\t"
+                    + "\t"
+                    + "\t"
+                    + "\t"
+                    + "\t"
+                    + str(e["output"]["error"]).replace("\n", r"\n")
+                )
+                print(line)
+                f.write(line + "\n")
 
 
 def transfer(args):
@@ -192,13 +194,13 @@ def transfer_helper(info):
     try:
         device = get_device(info)
         parsed = dict()
-        print("Running commands on " + device.hostname)
+        print("Running commands on " + info["switch"])
         commands = ["show version", "dir"]
         raw = device.cli(commands)
         parsed["raw"] = raw
         for command in commands:
             parsed[command] = parse.parse_output("cisco_ios", command, raw[command])
-        print("Running 'get_facts' on " + device.hostname)
+        print("Running 'get_facts' on " + info["switch"])
         parsed["facts"] = device.get_facts()
         image_version = re.match(
             r".*Version (.*?),?\s.*", parsed["facts"]["os_version"]
@@ -209,7 +211,7 @@ def transfer_helper(info):
             parsed["transferred"] = False
             parsed["up-to-date"] = True
             parsed["notes"] = "Already up to date."
-            return {"device": device.hostname, "output": parsed}
+            return {"device": info["switch"], "output": parsed}
         # Check if the file already exists.
         try:
             if re.match(".*/(.*)", info["file"]).group(1) in [
@@ -222,40 +224,40 @@ def transfer_helper(info):
                         "File "
                         + info["file"]
                         + " on device "
-                        + device.hostname
+                        + info["switch"]
                         + " has been verified. Ready for upgrade."
                     )
                     parsed["ready"] = True
                     parsed["transferred"] = False
                     parsed["up-to-date"] = False
-                    return {"device": device.hostname, "output": parsed}
+                    return {"device": info["switch"], "output": parsed}
         except:
             # defaults to re-copying the file if the file check or md5 causes issues.
-            print("Error checking for existing file on " + device.hostname)
+            print("Error checking for existing file on " + info["switch"])
             print("Current file list = " + str(parsed["dir"]))
             print("Current file = " + info["file"])
             print(traceback.format_exc())
         # Make sure there is enough free space.
         free_space = parsed["dir"][0]["total_free"]
         if int(info["size"]) >= int(free_space):
-            print("Not enough free space on device " + device.hostname)
+            print("Not enough free space on device " + info["switch"])
             parsed["ready"] = False
             parsed["transferred"] = False
             parsed["up-to-date"] = False
             parsed["notes"] = "Not enough free space."
-            return {"device": device.hostname, "output": parsed}
+            return {"device": info["switch"], "output": parsed}
         # Make sure 'confirm-copy' was entered - not a dry run.
         if not info["confirm_transfer"]:
             print(
                 "'confirm-copy' is needed alongside 'transfer' in order to copy the file. \nCopy for device "
-                + device.hostname
+                + info["switch"]
                 + " has been skipped."
             )
             parsed["ready"] = False
             parsed["transferred"] = False
             parsed["up-to-date"] = False
             parsed["notes"] = "Dry-run only."
-            return {"device": device.hostname, "output": parsed}
+            return {"device": info["switch"], "output": parsed}
         # Perform the copy. This requires a separate netmiko connection,
         # as most switches are configured for an interactive session.
         else:
@@ -265,36 +267,38 @@ def transfer_helper(info):
             if hostname[-1:] == ">":
                 device._netmiko_device.enable()
                 hostname = device._netmiko_device.find_prompt()
-            print("Beginning file copy on " + device.hostname)
+            print("Beginning file copy on " + info["switch"])
             start_time = datetime.now()
             copy_progress = device._netmiko_device.send_command_timing(
                 "copy " + info["file"] + " flash:"
             )
-            possible_prompts = {r"Address or name of remote host \[.*\]?": '\n',
-                                r"Source username \[.*\]\? ": 'anonymous\n',
-                                r"Source filename \[.*\]\?": '\n',
-                                r".*Destination filename \[.*\]\?": '\n',
-                                r"Do you want to over write\? \[.*\]": 'confirm\n',
-                                r"Password:": '\n'}
+            possible_prompts = {
+                r"Address or name of remote host \[.*\]?": "\n",
+                r"Source username \[.*\]\? ": "anonymous\n",
+                r"Source filename \[.*\]\?": "\n",
+                r".*Destination filename \[.*\]\?": "\n",
+                r"Do you want to over write\? \[.*\]": "confirm\n",
+                r"Password:": "\n",
+            }
             copying = True
-            last_print = ''
+            last_print = ""
             while copying:
                 copy_progress += device._netmiko_device.read_channel()
                 for match, command in possible_prompts.items():
                     # only check the last line. Avoids regex multiline headaches.
-                    check = copy_progress.splitlines()[-1] 
+                    check = copy_progress.splitlines()[-1]
                     if re.match(match, check):
                         device._netmiko_device.write_channel(command)
                 if hostname in copy_progress:
                     copying = False
                 else:
-                    if 'scp' in info["file"]:
+                    if "scp" in info["file"]:
                         progress_modifier = 10000
                     else:
                         progress_modifier = 256000
-                    percent_complete = (copy_progress.count("!") * progress_modifier) / int(
-                        info["size"]
-                    )
+                    percent_complete = (
+                        copy_progress.count("!") * progress_modifier
+                    ) / int(info["size"])
                     if percent_complete > 0.01:
                         eta = ((datetime.now() - start_time) / percent_complete) - (
                             datetime.now() - start_time
@@ -303,14 +307,14 @@ def transfer_helper(info):
                             "Copy ~"
                             + "{:.0%}".format(percent_complete)
                             + " complete on "
-                            + device.hostname
+                            + info["switch"]
                             + " Estimated Time Remaining: "
                             + str(eta)
                         )
                 sleep(5)
             print(
                 "File copy for "
-                + device.hostname
+                + info["switch"]
                 + " completed in "
                 + str(start_time - datetime.now())
             )
@@ -326,7 +330,7 @@ def transfer_helper(info):
                     "File "
                     + info["file"]
                     + " on device "
-                    + device.hostname
+                    + info["switch"]
                     + " has been verified. Ready for upgrade."
                 )
             else:
@@ -338,34 +342,34 @@ def transfer_helper(info):
                     "File "
                     + info["file"]
                     + " on device "
-                    + device.hostname
+                    + info["switch"]
                     + " validation failed. md5: "
                     + parsed["md5"]
                     + " does not match the expected value: "
                     + info["md5"]
                 )
-            return {"device": device.hostname, "output": parsed}
+            return {"device": info["switch"], "output": parsed}
 
     except ConnectivityFailure:
         print("SSH and Telnet connectivity failed to " + info["switch"])
         return {"device": info["switch"], "output": {"error": "Failed, Connectivity"}}
     except netmiko.exceptions.NetmikoAuthenticationException:
-        print("Error authenticating to device " + device.hostname)
+        print("Error authenticating to device " + info["switch"])
         print(traceback.format_exc())
-        return {"device": device.hostname, "output": {"error": "Failed, Auth"}}
+        return {"device": info["switch"], "output": {"error": "Failed, Auth"}}
     except:
-        print("Error with device " + device.hostname)
+        print("Error with device " + info["switch"])
         print(traceback.format_exc())
         parsed["error"] = traceback.format_exc()
         try:
             device.close()
         except:
             pass
-        return {"device": device.hostname, "output": parsed}
+        return {"device": info["switch"], "output": parsed}
 
 
 def verify_helper(device, info):
-    print("Beginning file verification on " + device.hostname)
+    print("Beginning file verification on " + info["switch"])
     hostname = device._netmiko_device.find_prompt()
     if hostname[-1:] == ">":
         device._netmiko_device.enable()
@@ -393,7 +397,7 @@ def verify_helper(device, info):
                     "Verification ~"
                     + "{:.0%}".format(percent_complete)
                     + " complete on "
-                    + device.hostname
+                    + info["switch"]
                     + " Estimated Time Remaining: "
                     + str(eta)
                 )
@@ -446,9 +450,15 @@ def main():
     )
     parser.add_argument(
         "--output",
-        help="File to save the output data to. Default 'output.json'",
+        help="File to save the output data to, or file to parse. Default 'output.json'",
         type=str,
         default="output.json",
+    )
+    parser.add_argument(
+        "--parse-output",
+        help="File to save parsed output to. Default 'parsed.txt'",
+        type=str,
+        default="parsed.txt",
     )
     parser.add_argument(
         "function",
