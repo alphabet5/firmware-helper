@@ -10,6 +10,8 @@ import netmiko.exceptions
 from time import sleep
 from datetime import datetime
 import copy
+import logging
+import sys
 
 
 class ConnectivityFailure(Exception):
@@ -32,10 +34,13 @@ def is_open(ip, port, timeout=5):
 def get_device(info):
     driver = get_network_driver(info["driver"])
     optional_args = {
-        "global_delay_factor": info["delay"],
-        "auth_timeout": int(info["delay"] * 10),
-        "timeout": int(info["delay"] * 10),
-        "banner_timeout": int(info["delay"] * 10),
+        "auth_timeout": int(info["delay"]),
+        "timeout": int(info["delay"]),
+        "banner_timeout": int(info["delay"]),
+        "conn_timeout": int(info["delay"]),
+        "read_timeout_override": 0,
+        "read_timeout": 0,
+        "last_read": int(info["delay"]),
     }
     if info["enable"] != "":
         optional_args["secret"] = info["enable"]
@@ -152,18 +157,22 @@ def parse_output(args):
                 print(line)
                 f.write(line + "\n")
             else:
-                line = (
-                    parsed["facts"]["hostname"]
-                    + "\t"
-                    + e["device"]
-                    + "\t"
-                    + "\t"
-                    + "\t"
-                    + "\t"
-                    + "\t"
-                    + "\t"
-                    + str(e["output"]["error"]).replace("\n", r"\n")
-                )
+                try:
+                    parsed = e["output"]
+                    line = (
+                        parsed["facts"]["hostname"]
+                        + "\t"
+                        + e["device"]
+                        + "\t\t\t\t\t\t"
+                        + str(e["output"]["error"]).replace("\n", r"\n")
+                    )
+                except:
+                    line = (
+                        "\t"
+                        + e["device"]
+                        + "\t\t\t\t\t\t"
+                        + str(e["output"]["error"]).replace("\n", r"\n")
+                    )
                 print(line)
                 f.write(line + "\n")
 
@@ -261,8 +270,6 @@ def transfer_helper(info):
         # Perform the copy. This requires a separate netmiko connection,
         # as most switches are configured for an interactive session.
         else:
-            # file_copy_status = device.cli(['copy ' + info['file'] + ' flash:\n\n\n'])
-            # info = {'driver': 'ios', 'delay': 5, 'enable': '', 'switch': '192.168.1.254', 'transport': 'ssh', 'user': 'admin', 'password': 'password', 'file': 'ftp://192.168.1.143/c2960x-universalk9-mz.152-7.E7.bin'}
             hostname = device._netmiko_device.find_prompt()
             if hostname[-1:] == ">":
                 device._netmiko_device.enable()
@@ -435,9 +442,9 @@ def main():
     )
     parser.add_argument(
         "--delay",
-        help="Global delay factor for timeouts. Default: 10",
+        help="Value for timeouts. Default: 180",
         type=int,
-        default=10,
+        default=180,
     )
     parser.add_argument(
         "--driver", help="Napalm driver to use. Default: ios", default="ios", type=str
@@ -471,7 +478,20 @@ def main():
         type=str,
         nargs=1,
     )
+    parser.add_argument(
+        "--log-level",
+        help="INFO (default), ERROR, DEBUG",
+        type=str,
+        default="INFO",
+    )
+
     args = vars(parser.parse_args())
+    level = {"debug": logging.DEBUG, "error": logging.ERROR, "info": logging.INFO}[
+        args["log_level"].lower()
+    ]
+    logging.basicConfig(stream=sys.stdout, level=level)
+    logger = logging.getLogger("netmiko")
+
     if "check-transport" in args["function"]:
         check_transport(args)
     elif "fetch" in args["function"]:

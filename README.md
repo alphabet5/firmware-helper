@@ -167,3 +167,8 @@ python -m pip install *
 ### 0.0.4
 - Changed references.
 - Fixed reference to deepcopy on loading info.
+
+### 0.0.5
+- add logging
+- improve delays to use the new netmiko method.
+- fix errors with parsing when devices fail to collect information.
